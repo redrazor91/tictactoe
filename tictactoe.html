@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Ensures correct character rendering on all devices -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- viewport meta makes the page scale correctly on mobile screens -->
+  <title>Tic Tac Toe</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────────
+       Browsers apply their own default margins/padding. This wipes them out
+       so every element starts from a clean slate.
+       box-sizing: border-box means padding/border are included in an
+       element's total width/height — much more predictable to work with.   */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* ── Page Layout ────────────────────────────────────────────────────────
+       Flexbox with column direction stacks children vertically.
+       align-items + justify-content: center puts everything dead-center
+       both horizontally and vertically inside the full viewport height.     */
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;        /* vh = viewport height; 100vh = full screen */
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+    }
+
+    /* ── Title ──────────────────────────────────────────────────────────── */
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      letter-spacing: 4px;      /* spreads letters apart for a stylised look */
+      text-transform: uppercase;
+      color: #e94560;           /* accent red used throughout the design */
+    }
+
+    /* ── Status text (whose turn / win / draw message) ──────────────────── */
+    #status {
+      font-size: 1.2rem;
+      margin-bottom: 24px;
+      min-height: 1.6em;        /* reserves space so layout doesn't jump when text changes */
+      color: #a8dadc;
+      letter-spacing: 1px;
+    }
+
+    /* ── Game Board ─────────────────────────────────────────────────────────
+       CSS Grid creates the 3×3 layout.
+       repeat(3, 110px) = three columns each 110px wide.
+       gap adds gutters between the cells.                                   */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+    }
+
+    /* ── Individual Cell ────────────────────────────────────────────────── */
+    .cell {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 10px;
+      display: flex;            /* flexbox centers the X / O symbol inside */
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: bold;
+      cursor: pointer;
+      /* transition smooths the background and scale changes over time */
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;        /* prevents text selection when clicking fast */
+    }
+
+    /* Highlight empty cells on hover — .taken cells are excluded */
+    .cell:hover:not(.taken) {
+      background: #0f3460;
+      transform: scale(1.04);
+    }
+
+    /* Player colours — applied when a move is placed */
+    .cell.x { color: #e94560; } /* X = red  */
+    .cell.o { color: #a8dadc; } /* O = teal */
+
+    /* ── Winning cells ──────────────────────────────────────────────────────
+       Added to the three cells that form the winning line.
+       The pulse animation draws attention to the result.                    */
+    .cell.win {
+      background: #0f3460;
+      border-color: #e94560;
+      animation: pulse 0.5s ease;
+    }
+
+    /* Keyframe animation: briefly scales the cell up then back to normal */
+    @keyframes pulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    /* ── New Game Button ────────────────────────────────────────────────── */
+    #reset {
+      margin-top: 28px;
+      padding: 12px 36px;
+      font-size: 1rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #reset:hover {
+      background: #c73652;      /* slightly darker shade on hover */
+      transform: scale(1.05);
+    }
+
+    /* ── Scoreboard ─────────────────────────────────────────────────────── */
+    #scoreboard {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 20px;
+      font-size: 1rem;
+      letter-spacing: 1px;
+    }
+
+    .score-box {
+      text-align: center;
+    }
+
+    .score-box .label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .score-box .score {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+
+    /* Each player's score gets their signature colour */
+    .score-box.x-score .score    { color: #e94560; }
+    .score-box.o-score .score    { color: #a8dadc; }
+    .score-box.draw-score .score { color: #888; }
+
+    /* ── Mode Toggle (2 Players / vs AI) ──────────────────────────────────
+       overflow: hidden on the container clips the buttons' corners so the
+       group looks like one rounded pill rather than two separate buttons.   */
+    #mode-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: 18px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #0f3460;
+    }
+
+    #mode-toggle button {
+      padding: 8px 22px;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: #16213e;
+      color: #888;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* .active is toggled by JS to highlight the selected mode */
+    #mode-toggle button.active {
+      background: #0f3460;
+      color: #eee;
+    }
+
+    #mode-toggle button:hover:not(.active) {
+      background: #1a2a50;
+      color: #ccc;
+    }
+
+    /* Applied to all cells while the AI is calculating its move,
+       preventing the player from clicking and dimming the board visually */
+    .cell.thinking {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Tic Tac Toe</h1>
+
+  <!-- Mode toggle — calls setMode() directly via inline onclick -->
+  <div id="mode-toggle">
+    <button id="btn-pvp" class="active" onclick="setMode('pvp')">2 Players</button>
+    <button id="btn-ai" onclick="setMode('ai')">vs AI</button>
+  </div>
+
+  <!-- Scoreboard — three boxes track wins for X, draws, and wins for O -->
+  <div id="scoreboard">
+    <div class="score-box x-score">
+      <div class="label">X Wins</div>
+      <div class="score" id="scoreX">0</div>
+    </div>
+    <div class="score-box draw-score">
+      <div class="label">Draws</div>
+      <div class="score" id="scoreDraw">0</div>
+    </div>
+    <div class="score-box o-score">
+      <div class="label">O Wins</div>
+      <div class="score" id="scoreO">0</div>
+    </div>
+  </div>
+
+  <!-- Dynamic status line updated by JS throughout the game -->
+  <div id="status">Player X's turn</div>
+
+  <!-- The 9 cells of the board. data-i stores the cell's index (0–8),
+       which JS reads to know which square was clicked.                 -->
+  <div id="board">
+    <div class="cell" data-i="0"></div>
+    <div class="cell" data-i="1"></div>
+    <div class="cell" data-i="2"></div>
+    <div class="cell" data-i="3"></div>
+    <div class="cell" data-i="4"></div>
+    <div class="cell" data-i="5"></div>
+    <div class="cell" data-i="6"></div>
+    <div class="cell" data-i="7"></div>
+    <div class="cell" data-i="8"></div>
+  </div>
+
+  <button id="reset">New Game</button>
+
+  <script>
+    // ── Win conditions ──────────────────────────────────────────────────────
+    // Every possible set of three indices that forms a winning line.
+    // Rows first, then columns, then the two diagonals.
+    const WINS = [
+      [0,1,2],[3,4,5],[6,7,8], // rows
+      [0,3,6],[1,4,7],[2,5,8], // columns
+      [0,4,8],[2,4,6]          // diagonals
+    ];
+
+    // ── Game state ──────────────────────────────────────────────────────────
+    let board;    // array of 9 strings: '', 'X', or 'O'
+    let current;  // whose turn it is: 'X' or 'O'
+    let gameOver; // true once someone wins or the board is full
+    let mode = 'pvp'; // 'pvp' = two humans, 'ai' = human vs computer
+
+    // Scores persist across games until the mode is switched
+    let scores = { X: 0, O: 0, Draw: 0 };
+
+    // ── DOM references ──────────────────────────────────────────────────────
+    // Grabbed once at startup so we don't query the DOM on every move
+    const cells     = document.querySelectorAll('.cell');
+    const status    = document.getElementById('status');
+    const scoreX    = document.getElementById('scoreX');
+    const scoreO    = document.getElementById('scoreO');
+    const scoreDraw = document.getElementById('scoreDraw');
+
+    // ── setMode ─────────────────────────────────────────────────────────────
+    // Called when the player clicks "2 Players" or "vs AI".
+    // Resets scores and starts a fresh game in the chosen mode.
+    function setMode(m) {
+      mode = m;
+      // classList.toggle(class, condition) adds the class when condition is
+      // true and removes it when false — a clean one-liner for toggling
+      document.getElementById('btn-pvp').classList.toggle('active', m === 'pvp');
+      document.getElementById('btn-ai').classList.toggle('active', m === 'ai');
+      scores = { X: 0, O: 0, Draw: 0 }; // wipe scores when switching modes
+      updateScores();
+      init();
+    }
+
+    // ── init ─────────────────────────────────────────────────────────────────
+    // Resets all game state and clears the board UI for a new game.
+    function init() {
+      board    = Array(9).fill(''); // fresh empty board
+      current  = 'X';              // X always goes first
+      gameOver = false;
+
+      // Strip all classes and text from every cell back to a blank state
+      cells.forEach(c => {
+        c.textContent = '';
+        c.className = 'cell';     // resets x, o, taken, win classes
+      });
+
+      status.textContent = mode === 'ai' ? `Your turn (X)` : `Player X's turn`;
+    }
+
+    // ── checkWinner ──────────────────────────────────────────────────────────
+    // Used by minimax to evaluate a board state (not necessarily the live board).
+    // Returns 'X', 'O', or null — does NOT return the winning indices.
+    function checkWinner(b) {
+      for (const [a, i, c] of WINS) {
+        if (b[a] && b[a] === b[i] && b[a] === b[c]) return b[a];
+      }
+      return null;
+    }
+
+    // ── checkWin ─────────────────────────────────────────────────────────────
+    // Used on the live board after each move.
+    // Returns the three winning indices so we can highlight them, or null.
+    function checkWin() {
+      for (const [a, b, c] of WINS) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return [a, b, c];
+        }
+      }
+      return null;
+    }
+
+    // ── minimax ──────────────────────────────────────────────────────────────
+    // A recursive algorithm that simulates every possible future game state
+    // to find the move with the best guaranteed outcome for the AI (O).
+    //
+    // How it works:
+    //   • The function alternates between two roles each call:
+    //       - Maximizing (AI's turn)  → wants the highest score
+    //       - Minimizing (human's turn) → wants the lowest score
+    //   • Terminal states return a score:
+    //       +10  = AI wins,  -10 = human wins,  0 = draw
+    //   • The AI picks whichever move leads to the best reachable score.
+    //
+    // Alpha-Beta Pruning (the alpha/beta parameters):
+    //   • alpha = best score the maximizer is guaranteed so far
+    //   • beta  = best score the minimizer is guaranteed so far
+    //   • If beta <= alpha, the opponent would never let us reach this branch,
+    //     so we stop exploring it early ("prune"). This dramatically cuts down
+    //     the number of positions evaluated without changing the result.
+    //
+    // Parameters:
+    //   b             – a copy of the board array to simulate on
+    //   isMaximizing  – true when it's the AI's turn, false for the human's
+    //   alpha         – best score maximizer has found so far (start: -Infinity)
+    //   beta          – best score minimizer has found so far (start: +Infinity)
+    function minimax(b, isMaximizing, alpha, beta) {
+      // ── Base cases: game is already decided ──
+      const winner = checkWinner(b);
+      if (winner === 'O') return 10;   // AI won — great outcome
+      if (winner === 'X') return -10;  // Human won — bad outcome for AI
+      if (b.every(v => v)) return 0;   // Board full, no winner → draw
+
+      if (isMaximizing) {
+        // AI's turn: try every empty cell and keep the highest score
+        let best = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!b[i]) {
+            b[i] = 'O';                                      // simulate AI move
+            best = Math.max(best, minimax(b, false, alpha, beta));
+            b[i] = '';                                       // undo the move
+            alpha = Math.max(alpha, best);
+            // Prune: minimizer above us already has a better option,
+            // so this branch will never be chosen — stop early
+            if (beta <= alpha) break;
+          }
+        }
+        return best;
+      } else {
+        // Human's turn: try every empty cell and keep the lowest score
+        let best = Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!b[i]) {
+            b[i] = 'X';                                      // simulate human move
+            best = Math.min(best, minimax(b, true, alpha, beta));
+            b[i] = '';                                       // undo the move
+            beta = Math.min(beta, best);
+            // Prune: maximizer above us already has a better option
+            if (beta <= alpha) break;
+          }
+        }
+        return best;
+      }
+    }
+
+    // ── getBestMove ──────────────────────────────────────────────────────────
+    // Tries each empty cell as the AI's next move, scores it with minimax,
+    // and returns the index of the cell with the highest score.
+    function getBestMove() {
+      let bestVal  = -Infinity;
+      let bestMove = -1;
+
+      for (let i = 0; i < 9; i++) {
+        if (!board[i]) {
+          board[i] = 'O';  // tentatively place AI's piece
+          // isMaximizing is false here because after the AI places,
+          // the next turn belongs to the human (minimizer)
+          const val = minimax(board, false, -Infinity, Infinity);
+          board[i] = '';   // undo — we're just evaluating, not committing
+
+          if (val > bestVal) {
+            bestVal  = val;
+            bestMove = i;
+          }
+        }
+      }
+      return bestMove; // index of the best cell, or -1 if board is full
+    }
+
+    // ── applyMove ────────────────────────────────────────────────────────────
+    // Commits a move for the current player at index i, updates the DOM,
+    // then checks for a win or draw. Shared by both human and AI moves.
+    function applyMove(i) {
+      board[i] = current;
+      cells[i].textContent = current;
+      cells[i].classList.add(current.toLowerCase(), 'taken'); // 'taken' blocks hover
+
+      const win = checkWin();
+      if (win) {
+        // Highlight the three winning cells and end the game
+        gameOver = true;
+        win.forEach(idx => cells[idx].classList.add('win'));
+        status.textContent = mode === 'ai'
+          ? (current === 'X' ? 'You win!' : 'AI wins!')
+          : `Player ${current} wins!`;
+        scores[current]++;
+        updateScores();
+      } else if (board.every(v => v)) {
+        // All 9 cells filled, no winner → draw
+        gameOver = true;
+        status.textContent = `It's a draw!`;
+        scores.Draw++;
+        updateScores();
+      } else {
+        // Game continues — swap the active player
+        current = current === 'X' ? 'O' : 'X';
+        status.textContent = mode === 'ai'
+          ? (current === 'X' ? `Your turn (X)` : `AI is thinking...`)
+          : `Player ${current}'s turn`;
+      }
+    }
+
+    // ── aiMove ───────────────────────────────────────────────────────────────
+    // Triggers the AI's turn with a short delay so it doesn't feel instant.
+    // The 'thinking' class dims the board and blocks pointer events meanwhile.
+    function aiMove() {
+      cells.forEach(c => c.classList.add('thinking'));
+      setTimeout(() => {
+        cells.forEach(c => c.classList.remove('thinking'));
+        if (!gameOver) {
+          const move = getBestMove();
+          if (move !== -1) applyMove(move);
+        }
+      }, 300); // 300ms pause — feels natural without being annoying
+    }
+
+    // ── Click handler ────────────────────────────────────────────────────────
+    // Attached to every cell. The unary + converts the data-i string to a number.
+    cells.forEach(cell => {
+      cell.addEventListener('click', () => {
+        const i = +cell.dataset.i;
+
+        // Ignore clicks if the game is over or the cell is already taken
+        if (gameOver || board[i]) return;
+
+        // In AI mode, ignore clicks when it's O's turn (AI is moving)
+        if (mode === 'ai' && current === 'O') return;
+
+        applyMove(i);
+
+        // After a valid human move in AI mode, trigger the AI's response
+        if (mode === 'ai' && !gameOver && current === 'O') {
+          aiMove();
+        }
+      });
+    });
+
+    // ── updateScores ─────────────────────────────────────────────────────────
+    // Pushes the current score values into the DOM display elements.
+    function updateScores() {
+      scoreX.textContent    = scores.X;
+      scoreO.textContent    = scores.O;
+      scoreDraw.textContent = scores.Draw;
+    }
+
+    // Wire up the reset button and kick off the first game
+    document.getElementById('reset').addEventListener('click', init);
+    init();
+  </script>
+</body>
+</html>
